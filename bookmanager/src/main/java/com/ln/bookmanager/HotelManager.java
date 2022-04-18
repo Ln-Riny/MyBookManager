@@ -18,11 +18,13 @@ public class HotelManager {
 
     private LinkedList<Booking> storage;
 
-    private HashMap<String, ArrayList<Booking>> guestCache;
+    //volatile avoid reading expire data
+    private volatile HashMap<String, ArrayList<Booking>> guestCache;
 
-    private HashMap<Date, ArrayList<Integer>> bookingCache;
+    private volatile HashMap<Date, ArrayList<Integer>> bookingCache;
 
-    private ReadWriteLock lock;
+    //lock room by roomNo to reduce lock contention
+    private HashMap<Integer, ReadWriteLock> lockMap;
 
     private int i = 0;
 
@@ -31,16 +33,19 @@ public class HotelManager {
         storage = new LinkedList<>();
         guestCache = new HashMap<>();
         bookingCache = new HashMap<>();
-        lock = new ReentrantReadWriteLock();
+        lockMap = new HashMap<>();
+        for (int i = 0; i < num; i++) {
+            lockMap.put(i, new ReentrantReadWriteLock());
+        }
     }
 
     public void storeBooking(Booking book) {
+        //validate roomNo
+        if (book.getRoomNo() >= roomNum || book.getRoomNo() < 0) {
+            return;
+        }
         try {
-            lock.writeLock().lock();
-            //validate roomNo
-            if (book.getRoomNo() > roomNum) {
-                return;
-            }
+            lockMap.get(book.getRoomNo()).writeLock().lock();
             //validate date
             ArrayList<Integer> rooms = bookingCache.get(book.getDate());
             if (rooms != null && rooms.contains(book.getRoomNo())) {
@@ -56,31 +61,21 @@ public class HotelManager {
             bookingList.add(book);
             guestCache.put(book.getGuestName(), bookingList);
         } finally {
-            lock.writeLock().unlock();
+            lockMap.get(book.getRoomNo()).writeLock().unlock();
         }
     }
 
     public List<Integer> findAvailableRoomList(Date date) {
-        try {
-            lock.readLock().lock();
-            List<Integer> ret = new ArrayList<>();
-            for (Integer i = 1; i <= roomNum; i++) {
-                if (!bookingCache.getOrDefault(date, new ArrayList<>()).contains(i)) {
-                    ret.add(i);
-                }
+        List<Integer> ret = new ArrayList<>();
+        for (Integer i = 1; i <= roomNum; i++) {
+            if (!bookingCache.getOrDefault(date, new ArrayList<>()).contains(i)) {
+                ret.add(i);
             }
-            return ret;
-        } finally {
-            lock.readLock().unlock();
         }
+        return ret;
     }
 
     public List<Booking> findBookList(String guestName) {
-        try {
-            lock.readLock().lock();
-            return guestCache.get(guestName);
-        } finally {
-            lock.readLock().unlock();
-        }
+        return guestCache.get(guestName);
     }
 }

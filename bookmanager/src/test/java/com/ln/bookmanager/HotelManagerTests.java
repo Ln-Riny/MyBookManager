@@ -2,11 +2,14 @@ package com.ln.bookmanager;
 
 import java.sql.Date;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 public class HotelManagerTests {
@@ -55,7 +58,29 @@ public class HotelManagerTests {
         System.out.println(hotelManager.findBookList("Richard"));
         System.out.println("Job reserved success times: " + hotelManager.findBookList("Job").size());
         System.out.println(hotelManager.findBookList("Job"));
-        System.out.println();
     }
 
+    @Test
+    public void testBookingRepeat() {
+        HotelManager hotelManager = new HotelManager(10);
+        Booking testBooking = new Booking("Anna", 1, Date.valueOf(LocalDate.of(2022, 3, 2)));
+        hotelManager.storeBooking(testBooking);
+        hotelManager.storeBooking(testBooking);
+        ArrayList<Booking> expect = new ArrayList<>();
+        expect.add(testBooking);
+        List<Booking> actual = hotelManager.findBookList("Anna");
+        System.out.println(actual);
+        Assert.assertTrue(expect.equals(actual));
+    }
+
+    @Test
+    public void testBookingRoomOutOfRange() {
+        HotelManager hotelManager = new HotelManager(10);
+        Booking testBooking1 = new Booking("Anna", -1, Date.valueOf(LocalDate.of(2022, 3, 2)));
+        Booking testBooking2 = new Booking("Anna", 10, Date.valueOf(LocalDate.of(2022, 3, 2)));
+        hotelManager.storeBooking(testBooking1);
+        hotelManager.storeBooking(testBooking2);
+        List<Booking> actual = hotelManager.findBookList("Anna");
+        Assert.assertNull(actual);
+    }
 }
